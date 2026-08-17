@@ -1,4 +1,7 @@
 # 🤖 AI Business Anomaly Agent
+## 📊 Dashboard Preview
+
+![AI Business Anomaly Agent Dashboard](screenshots/sss.png)
 
 An AI-powered business monitoring system that automatically analyzes business data, detects unusual changes, generates business insights using Gemini AI, and sends email alerts.
 
