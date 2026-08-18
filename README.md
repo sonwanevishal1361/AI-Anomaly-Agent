@@ -1,136 +1,52 @@
 # 🤖 AI Business Anomaly Agent
-## 📊 Dashboard Preview
 
-![AI Business Anomaly Agent Dashboard](screenshots/sss.png)
-
-An AI-powered business monitoring system that automatically analyzes business data, detects unusual changes, generates business insights using Gemini AI, and sends email alerts.
+An intelligent and dynamic business analytics application that automatically detects unusual patterns in CSV and Excel business datasets and generates AI-powered business insights using Google Gemini.
 
 ---
 
-## 📌 Project Overview
+## 📸 Project Preview
 
-Traditional dashboards show what happened.
-
-This project goes one step further.
-
-The AI Business Anomaly Agent continuously monitors business metrics and identifies unusual changes before they become bigger business problems.
-
-The system can:
-
-- Read business data
-- Calculate metric changes
-- Compare current values with historical baselines
-- Detect anomalies
-- Determine anomaly severity
-- Generate AI-powered business explanations
-- Send email alerts
-- Maintain alert history
-- Display results through an interactive dashboard
+![AI Business Anomaly Agent Dashboard](c:\Users\Admin\Pictures\dashboard.png)
 
 ---
 
-## 🎯 Business Problem
+## 🚀 Features
 
-Business teams often depend on manually checking spreadsheets and dashboards.
-
-This creates several problems:
-
-- Important changes can be missed
-- Manual monitoring takes time
-- Managers may discover problems too late
-- Raw numbers do not always explain what happened
-
-This project solves the problem by automatically monitoring important business metrics and notifying the user when unusual behavior is detected.
-
----
-
-## 🚀 Key Features
-
-### 1. Automated Data Monitoring
-
-The system reads business data from CSV files.
-
-### 2. Anomaly Detection
-
-The agent compares current metrics with a historical baseline.
-
-Metrics monitored include:
-
-- Revenue
-- Orders
-- Traffic
-- Conversion Rate
-- Cost
-- Refunds
-
-### 3. Severity Detection
-
-Detected anomalies are classified as:
-
-- Normal
-- Low
-- Medium
-- Critical
-
-### 4. Gemini AI Analysis
-
-Gemini analyzes the detected anomaly and generates:
-
-- What happened
-- Possible causes
-- Business impact
-- Recommended actions
-
-### 5. Email Alerts
-
-When a serious anomaly is detected, the system sends an email notification.
-
-### 6. Duplicate Alert Prevention
-
-The system checks alert history before sending another email for the same anomaly.
-
-### 7. Interactive Dashboard
-
-The Streamlit dashboard provides:
-
-- KPI cards
-- Revenue trend
-- Metric changes
-- Revenue vs Cost
-- Anomaly history
-- AI analysis
-- Email alert history
-
-### 8. Report Download
-
-Users can download the anomaly report as a CSV file.
+- 📂 Upload CSV or Excel business datasets
+- 🔍 Automatic dataset analysis
+- 📅 Automatic date-column detection
+- 📊 Automatic business metric detection
+- 🚨 Statistical anomaly detection
+- 📈 Anomaly trend visualization
+- 🎯 Business risk scoring
+- 🔴 Critical / High / Medium anomaly classification
+- 🤖 Gemini AI-powered business analysis
+- 💡 Possible causes and recommended actions
+- 📥 Downloadable anomaly reports
+- 📥 Downloadable AI business reports
+- 🔄 Dynamic support for different business datasets
 
 ---
 
-## 🧠 System Architecture
+## 🧠 How It Works
 
 ```text
-Business Data
-     |
-     v
-Data Cleaning
-     |
-     v
-Historical Baseline
-     |
-     v
-Anomaly Detection
-     |
-     v
-Severity Classification
-     |
-     +----------------------+
-     |                      |
-     v                      v
-Gemini AI              Email Alert
-     |                      |
-     v                      v
-Business Insight       Alert History
-     |
-     v
-Streamlit Dashboard
+Upload CSV / Excel Dataset
+            ↓
+      Data Cleaning
+            ↓
+   Automatic Column Detection
+            ↓
+   Business Metric Detection
+            ↓
+    Anomaly Detection
+            ↓
+   Anomaly Trend Analysis
+            ↓
+    Business Risk Score
+            ↓
+      Gemini AI Analysis
+            ↓
+  Business Recommendations
+            ↓
+       Download Reports
