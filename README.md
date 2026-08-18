@@ -6,7 +6,7 @@ An intelligent and dynamic business analytics application that automatically det
 
 ## 📸 Project Preview
 
-![AI Business Anomaly Agent Dashboard](c:\Users\Admin\Pictures\dashboard.png)
+![AI Business Anomaly Agent Dashboard](screenshots/dashboard.png)
 
 ---
 
