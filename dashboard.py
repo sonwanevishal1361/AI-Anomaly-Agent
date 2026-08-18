@@ -1,94 +1,26 @@
-import os
-import pandas as pd
 import streamlit as st
+import pandas as pd
+import plotly.express as px
 import plotly.graph_objects as go
 from dotenv import load_dotenv
-from google import genai
+
+from ai_report import generate_ai_report
+from metric_detector import detect_business_metrics, explain_metric
+from anomaly_detector import detect_anomalies
+from risk_engine import calculate_risk_score
+from anomaly_trends import create_anomaly_trend_chart
 
 
 # ============================================================
-# PAGE CONFIGURATION
-# ============================================================
-
-st.set_page_config(
-    page_title="AI Business Anomaly Agent",
-    page_icon="🤖",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-
-# ============================================================
-# LOAD ENVIRONMENT VARIABLES
+# CONFIGURATION
 # ============================================================
 
 load_dotenv()
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-DATA_FILE = "data/business_data.csv"
-ALERT_FILE = "outputs/alert_history.csv"
-
-
-# ============================================================
-# CUSTOM CSS
-# ============================================================
-
-st.markdown(
-    """
-    <style>
-
-    .main {
-        padding-top: 1rem;
-    }
-
-    .dashboard-title {
-        font-size: 38px;
-        font-weight: 700;
-        margin-bottom: 0px;
-    }
-
-    .dashboard-subtitle {
-        font-size: 16px;
-        color: #777777;
-        margin-bottom: 25px;
-    }
-
-    .section-title {
-        font-size: 24px;
-        font-weight: 600;
-        margin-top: 25px;
-        margin-bottom: 15px;
-    }
-
-    .status-normal {
-        padding: 18px;
-        border-radius: 12px;
-        background-color: #e9f7ef;
-        text-align: center;
-        font-size: 20px;
-        font-weight: 700;
-    }
-
-    .status-danger {
-        padding: 18px;
-        border-radius: 12px;
-        background-color: #fdecea;
-        text-align: center;
-        font-size: 20px;
-        font-weight: 700;
-    }
-
-    .ai-box {
-        padding: 22px;
-        border-radius: 12px;
-        background-color: #f5f5f5;
-        border: 1px solid #dddddd;
-    }
-
-    </style>
-    """,
-    unsafe_allow_html=True
+st.set_page_config(
+    page_title="AI Business Anomaly Agent",
+    page_icon="🤖",
+    layout="wide"
 )
 
 
@@ -96,819 +28,1069 @@ st.markdown(
 # HEADER
 # ============================================================
 
-st.markdown(
-    '<div class="dashboard-title">'
-    '🤖 AI Business Anomaly Agent'
-    '</div>',
-    unsafe_allow_html=True
-)
+st.title("🤖 AI Business Anomaly Agent")
 
-st.markdown(
-    '<div class="dashboard-subtitle">'
-    'Automated business monitoring • anomaly detection • AI-powered insights'
-    '</div>',
-    unsafe_allow_html=True
+st.caption(
+    "Dynamic business anomaly detection with "
+    "statistical analysis, AI insights and risk assessment."
 )
 
 
 # ============================================================
-# LOAD DATA
+# FILE UPLOAD
 # ============================================================
 
-try:
+st.sidebar.header("📂 Upload Business Data")
 
-    df = pd.read_csv(DATA_FILE)
+uploaded_file = st.sidebar.file_uploader(
+    "Upload CSV or Excel file",
+    type=["csv", "xlsx", "xls"]
+)
 
-except Exception as e:
 
-    st.error(
-        f"Unable to load business data: {e}"
+if uploaded_file is None:
+
+    st.info(
+        "👈 Upload a CSV or Excel file from the sidebar."
+    )
+
+    st.markdown(
+        """
+        ## 🚀 AI Business Anomaly Agent
+
+        Upload any business CSV or Excel dataset and the
+        system automatically:
+
+        - 🔍 Understands the uploaded data
+        - 📅 Detects date columns
+        - 📊 Detects business metrics
+        - 🚨 Detects anomalies
+        - 📈 Analyzes anomaly trends
+        - 🎯 Calculates business risk
+        - 🤖 Uses Gemini AI for explanations
+        - 💡 Generates recommendations
+        - 📥 Creates downloadable reports
+
+        ### Detection Engine
+
+        **Percentage Change + Z-Score**
+
+        ### AI Layer
+
+        **Gemini Business Intelligence Analysis**
+
+        ### Risk Layer
+
+        **Critical / High / Medium / Low**
+        """
     )
 
     st.stop()
 
 
 # ============================================================
-# DATA CLEANING
+# READ FILE
 # ============================================================
 
-df["Date"] = pd.to_datetime(
-    df["Date"],
-    errors="coerce"
+try:
+
+    if uploaded_file.name.lower().endswith(".csv"):
+
+        df = pd.read_csv(
+            uploaded_file
+        )
+
+    else:
+
+        df = pd.read_excel(
+            uploaded_file
+        )
+
+except Exception as e:
+
+    st.error(
+        f"❌ Could not read the uploaded file: {e}"
+    )
+
+    st.stop()
+
+
+# ============================================================
+# BASIC CLEANING
+# ============================================================
+
+df = df.dropna(
+    how="all"
+).copy()
+
+df.columns = (
+    df.columns
+    .astype(str)
+    .str.strip()
 )
 
-numeric_columns = [
-    "Revenue",
-    "Orders",
-    "Traffic",
-    "Conversion_Rate",
-    "Cost",
-    "Refunds"
+df = df.dropna(
+    axis=1,
+    how="all"
+)
+
+
+# ============================================================
+# AUTOMATIC NUMERIC CONVERSION
+# ============================================================
+
+for column in df.columns:
+
+    if df[column].dtype == "object":
+
+        cleaned = (
+            df[column]
+            .astype(str)
+            .str.replace(
+                ",",
+                "",
+                regex=False
+            )
+            .str.replace(
+                "₹",
+                "",
+                regex=False
+            )
+            .str.replace(
+                "$",
+                "",
+                regex=False
+            )
+            .str.replace(
+                "€",
+                "",
+                regex=False
+            )
+            .str.replace(
+                "£",
+                "",
+                regex=False
+            )
+            .str.strip()
+        )
+
+        converted = pd.to_numeric(
+            cleaned,
+            errors="coerce"
+        )
+
+        if converted.notna().mean() >= 0.85:
+
+            df[column] = converted
+
+
+# ============================================================
+# FILE INFORMATION
+# ============================================================
+
+st.sidebar.success(
+    f"Loaded: {uploaded_file.name}"
+)
+
+st.sidebar.write(
+    f"Rows: **{len(df):,}**"
+)
+
+st.sidebar.write(
+    f"Columns: **{len(df.columns):,}**"
+)
+
+
+# ============================================================
+# DATE DETECTION
+# ============================================================
+
+date_candidates = []
+
+date_keywords = [
+    "date",
+    "time",
+    "timestamp",
+    "day",
+    "month"
 ]
 
-for column in numeric_columns:
 
-    df[column] = pd.to_numeric(
-        df[column],
+for column in df.columns:
+
+    column_name = str(
+        column
+    ).lower()
+
+    if any(
+        keyword in column_name
+        for keyword in date_keywords
+    ):
+
+        try:
+
+            converted = pd.to_datetime(
+                df[column],
+                errors="coerce"
+            )
+
+            if converted.notna().mean() >= 0.60:
+
+                date_candidates.append(
+                    column
+                )
+
+        except Exception:
+
+            pass
+
+
+# ============================================================
+# DATE SELECTION
+# ============================================================
+
+st.sidebar.header("📅 Date Column")
+
+if date_candidates:
+
+    date_column = st.sidebar.selectbox(
+        "Select date column",
+        date_candidates
+    )
+
+    df[date_column] = pd.to_datetime(
+        df[date_column],
         errors="coerce"
     )
 
+    df = df.dropna(
+        subset=[date_column]
+    )
 
-df = df.dropna(
-    subset=[
-        "Date",
-        "Revenue",
-        "Orders",
-        "Traffic",
-        "Conversion_Rate",
-        "Cost",
-        "Refunds"
+    df = df.sort_values(
+        date_column
+    )
+
+else:
+
+    date_column = None
+
+    st.sidebar.info(
+        "No date column automatically detected."
+    )
+
+
+# ============================================================
+# BUSINESS METRIC DETECTION
+# ============================================================
+
+detected_metrics = detect_business_metrics(
+    df
+)
+
+
+if not detected_metrics:
+
+    st.error(
+        """
+        ❌ No suitable business metrics detected.
+
+        Your dataset should contain numeric business
+        measurements such as:
+
+        Sales, Revenue, Profit, Cost, Quantity,
+        Orders, Customers, Amount, etc.
+        """
+    )
+
+    st.stop()
+
+
+# ============================================================
+# METRIC SELECTION
+# ============================================================
+
+st.sidebar.header("📊 Business Metrics")
+
+selected_metrics = st.sidebar.multiselect(
+    "Select metrics to monitor",
+    detected_metrics,
+    default=detected_metrics[
+        :min(5, len(detected_metrics))
     ]
 )
 
-df = df.sort_values(
-    "Date"
-).reset_index(drop=True)
+
+if not selected_metrics:
+
+    st.warning(
+        "Please select at least one metric."
+    )
+
+    st.stop()
 
 
 # ============================================================
-# BASELINES
+# METRIC INFORMATION
 # ============================================================
 
-df["Revenue_Baseline"] = (
-    df["Revenue"]
-    .rolling(7)
-    .mean()
-    .shift(1)
-)
+with st.sidebar.expander(
+    "ℹ️ Detected Metric Information"
+):
 
-df["Orders_Baseline"] = (
-    df["Orders"]
-    .rolling(7)
-    .mean()
-    .shift(1)
-)
+    for metric in detected_metrics:
 
-df["Traffic_Baseline"] = (
-    df["Traffic"]
-    .rolling(7)
-    .mean()
-    .shift(1)
-)
-
-df["Conversion_Baseline"] = (
-    df["Conversion_Rate"]
-    .rolling(7)
-    .mean()
-    .shift(1)
-)
-
-df["Refunds_Baseline"] = (
-    df["Refunds"]
-    .rolling(7)
-    .mean()
-    .shift(1)
-)
+        st.write(
+            f"**{metric}** — "
+            f"{explain_metric(metric)}"
+        )
 
 
 # ============================================================
-# PERCENTAGE CHANGES
+# DETECTION SETTINGS
 # ============================================================
 
-def calculate_change(current, baseline):
+st.sidebar.header("⚙️ Detection Settings")
 
-    if pd.isna(baseline) or baseline == 0:
-
-        return 0
-
-    return (
-        (current - baseline)
-        / baseline
-    ) * 100
-
-
-df["Revenue_Change"] = df.apply(
-    lambda row: calculate_change(
-        row["Revenue"],
-        row["Revenue_Baseline"]
-    ),
-    axis=1
+lookback_period = st.sidebar.slider(
+    "Historical baseline periods",
+    min_value=3,
+    max_value=30,
+    value=7
 )
 
-df["Orders_Change"] = df.apply(
-    lambda row: calculate_change(
-        row["Orders"],
-        row["Orders_Baseline"]
-    ),
-    axis=1
+threshold = st.sidebar.slider(
+    "Percentage threshold (%)",
+    min_value=5,
+    max_value=100,
+    value=20,
+    step=5
 )
 
-df["Traffic_Change"] = df.apply(
-    lambda row: calculate_change(
-        row["Traffic"],
-        row["Traffic_Baseline"]
-    ),
-    axis=1
+z_threshold = st.sidebar.slider(
+    "Z-score threshold",
+    min_value=1.5,
+    max_value=5.0,
+    value=2.5,
+    step=0.5
 )
 
-df["Conversion_Change"] = df.apply(
-    lambda row: calculate_change(
-        row["Conversion_Rate"],
-        row["Conversion_Baseline"]
-    ),
-    axis=1
+
+# ============================================================
+# DATASET OVERVIEW
+# ============================================================
+
+st.subheader(
+    "📋 Dataset Overview"
 )
 
-df["Refunds_Change"] = df.apply(
-    lambda row: calculate_change(
-        row["Refunds"],
-        row["Refunds_Baseline"]
-    ),
-    axis=1
-)
+c1, c2, c3, c4 = st.columns(4)
+
+
+with c1:
+
+    st.metric(
+        "Rows",
+        f"{len(df):,}"
+    )
+
+
+with c2:
+
+    st.metric(
+        "Columns",
+        f"{len(df.columns):,}"
+    )
+
+
+with c3:
+
+    st.metric(
+        "Metrics",
+        f"{len(selected_metrics):,}"
+    )
+
+
+with c4:
+
+    if date_column:
+
+        latest_date = df[
+            date_column
+        ].max()
+
+        st.metric(
+            "Latest Date",
+            latest_date.strftime(
+                "%Y-%m-%d"
+            )
+        )
+
+    else:
+
+        st.metric(
+            "Date",
+            "Not detected"
+        )
+
+
+# ============================================================
+# DATA PREVIEW
+# ============================================================
+
+with st.expander(
+    "🔍 View Uploaded Data"
+):
+
+    st.dataframe(
+        df,
+        use_container_width=True
+    )
 
 
 # ============================================================
 # ANOMALY DETECTION
 # ============================================================
 
-df["Anomaly"] = (
-    df["Revenue_Change"].abs() > 20
-) | (
-    df["Orders_Change"].abs() > 20
-) | (
-    df["Traffic_Change"].abs() > 20
-) | (
-    df["Conversion_Change"].abs() > 20
-) | (
-    df["Refunds_Change"].abs() > 20
+analysis_df, anomaly_df = detect_anomalies(
+    df=df,
+    selected_metrics=selected_metrics,
+    date_column=date_column,
+    lookback_period=lookback_period,
+    threshold=threshold,
+    z_threshold=z_threshold
 )
 
 
 # ============================================================
-# SEVERITY
+# ANOMALY SUMMARY
 # ============================================================
 
-def get_severity(row):
-
-    changes = [
-        abs(row["Revenue_Change"]),
-        abs(row["Orders_Change"]),
-        abs(row["Traffic_Change"]),
-        abs(row["Conversion_Change"]),
-        abs(row["Refunds_Change"])
-    ]
-
-    maximum_change = max(changes)
-
-    number_of_anomalies = sum(
-        change > 20
-        for change in changes
-    )
-
-    if (
-        maximum_change >= 40
-        or number_of_anomalies >= 3
-    ):
-
-        return "CRITICAL"
-
-    elif (
-        maximum_change >= 20
-        or number_of_anomalies >= 2
-    ):
-
-        return "MEDIUM"
-
-    elif maximum_change >= 10:
-
-        return "LOW"
-
-    return "NORMAL"
-
-
-df["Severity"] = df.apply(
-    get_severity,
-    axis=1
+st.subheader(
+    "🚨 Anomaly Detection"
 )
 
 
-# ============================================================
-# LATEST DATA
-# ============================================================
+if anomaly_df.empty:
 
-latest = df.iloc[-1]
-
-latest_date = latest["Date"]
-
-
-# ============================================================
-# SIDEBAR
-# ============================================================
-
-st.sidebar.title(
-    "⚙️ Dashboard Controls"
-)
-
-st.sidebar.markdown(
-    "---"
-)
-
-show_anomalies = st.sidebar.checkbox(
-    "Show anomaly records only",
-    value=False
-)
-
-st.sidebar.markdown(
-    "---"
-)
-
-st.sidebar.write(
-    f"📅 Data from: "
-    f"{df['Date'].min().strftime('%d %b %Y')}"
-)
-
-st.sidebar.write(
-    f"📅 Data to: "
-    f"{df['Date'].max().strftime('%d %b %Y')}"
-)
-
-st.sidebar.write(
-    f"📊 Total records: {len(df)}"
-)
-
-st.sidebar.write(
-    f"🚨 Total anomalies: "
-    f"{int(df['Anomaly'].sum())}"
-)
-
-
-# ============================================================
-# KPI SECTION
-# ============================================================
-
-st.markdown(
-    '<div class="section-title">'
-    '📊 Latest Business Performance'
-    '</div>',
-    unsafe_allow_html=True
-)
-
-col1, col2, col3, col4, col5 = st.columns(5)
-
-
-with col1:
-
-    st.metric(
-        "Revenue",
-        f"₹{latest['Revenue']:,.0f}",
-        f"{latest['Revenue_Change']:.1f}%"
-    )
-
-
-with col2:
-
-    st.metric(
-        "Orders",
-        f"{latest['Orders']:,.0f}",
-        f"{latest['Orders_Change']:.1f}%"
-    )
-
-
-with col3:
-
-    st.metric(
-        "Traffic",
-        f"{latest['Traffic']:,.0f}",
-        f"{latest['Traffic_Change']:.1f}%"
-    )
-
-
-with col4:
-
-    st.metric(
-        "Conversion",
-        f"{latest['Conversion_Rate']:.2f}%",
-        f"{latest['Conversion_Change']:.1f}%"
-    )
-
-
-with col5:
-
-    st.metric(
-        "Refunds",
-        f"{latest['Refunds']:,.0f}",
-        f"{latest['Refunds_Change']:.1f}%"
-    )
-
-
-# ============================================================
-# SYSTEM STATUS
-# ============================================================
-
-st.markdown(
-    '<div class="section-title">'
-    '🚨 Monitoring Status'
-    '</div>',
-    unsafe_allow_html=True
-)
-
-
-if latest["Anomaly"]:
-
-    st.markdown(
-        f"""
-        <div class="status-danger">
-        🚨 {latest["Severity"]} ANOMALY DETECTED
-        <br>
-        <small>
-        {latest_date.strftime("%d %B %Y")}
-        </small>
-        </div>
-        """,
-        unsafe_allow_html=True
+    st.success(
+        "✅ No significant anomalies detected."
     )
 
 else:
 
-    st.markdown(
-        f"""
-        <div class="status-normal">
-        🟢 SYSTEM NORMAL
-        <br>
-        <small>
-        {latest_date.strftime("%d %B %Y")}
-        </small>
-        </div>
-        """,
-        unsafe_allow_html=True
+    critical_count = (
+        anomaly_df[
+            "Severity"
+        ]
+        .eq("CRITICAL")
+        .sum()
+    )
+
+    high_count = (
+        anomaly_df[
+            "Severity"
+        ]
+        .eq("HIGH")
+        .sum()
+    )
+
+    medium_count = (
+        anomaly_df[
+            "Severity"
+        ]
+        .eq("MEDIUM")
+        .sum()
+    )
+
+
+    c1, c2, c3, c4 = st.columns(4)
+
+
+    with c1:
+
+        st.metric(
+            "Total Anomalies",
+            len(anomaly_df)
+        )
+
+
+    with c2:
+
+        st.metric(
+            "Critical",
+            critical_count
+        )
+
+
+    with c3:
+
+        st.metric(
+            "High",
+            high_count
+        )
+
+
+    with c4:
+
+        st.metric(
+            "Medium",
+            medium_count
+        )
+
+
+    display_df = (
+        anomaly_df
+        .drop(
+            columns=["Index"],
+            errors="ignore"
+        )
+    )
+
+
+    st.dataframe(
+        display_df,
+        use_container_width=True,
+        hide_index=True
     )
 
 
 # ============================================================
-# REVENUE CHART
+# ANOMALY TREND
 # ============================================================
 
-st.markdown(
-    '<div class="section-title">'
-    '📈 Revenue Monitoring'
-    '</div>',
-    unsafe_allow_html=True
-)
+if (
+    not anomaly_df.empty
+    and date_column is not None
+):
 
-
-fig_revenue = go.Figure()
-
-
-fig_revenue.add_trace(
-    go.Scatter(
-        x=df["Date"],
-        y=df["Revenue"],
-        mode="lines+markers",
-        name="Revenue"
+    st.subheader(
+        "📈 Anomaly Trend"
     )
+
+    trend_chart = (
+        create_anomaly_trend_chart(
+            anomaly_df
+        )
+    )
+
+    if trend_chart is not None:
+
+        st.plotly_chart(
+            trend_chart,
+            use_container_width=True
+        )
+
+    else:
+
+        st.info(
+            "Not enough date information "
+            "to create the anomaly trend."
+        )
+
+
+# ============================================================
+# BUSINESS RISK SCORE
+# ============================================================
+
+st.subheader(
+    "🎯 Overall Business Risk"
 )
 
 
-anomaly_rows = df[
-    df["Anomaly"]
+risk_result = calculate_risk_score(
+    anomaly_df
+)
+
+
+risk_score = risk_result[
+    "score"
+]
+
+risk_level = risk_result[
+    "level"
 ]
 
 
-fig_revenue.add_trace(
-    go.Scatter(
-        x=anomaly_rows["Date"],
-        y=anomaly_rows["Revenue"],
-        mode="markers",
-        name="Anomaly",
-        marker={
-            "size": 12,
-            "symbol": "x"
+# ============================================================
+# RISK GAUGE
+# ============================================================
+
+gauge_color = "green"
+
+if risk_score >= 70:
+
+    gauge_color = "red"
+
+elif risk_score >= 40:
+
+    gauge_color = "orange"
+
+elif risk_score >= 15:
+
+    gauge_color = "yellow"
+
+
+fig_gauge = go.Figure(
+    go.Indicator(
+        mode="gauge+number",
+        value=risk_score,
+        title={
+            "text": f"Business Risk: {risk_level}"
+        },
+        gauge={
+            "axis": {
+                "range": [0, 100]
+            },
+            "bar": {
+                "color": gauge_color
+            },
+            "steps": [
+                {
+                    "range": [0, 15],
+                    "color": "lightgray"
+                },
+                {
+                    "range": [15, 40],
+                    "color": "lightyellow"
+                },
+                {
+                    "range": [40, 70],
+                    "color": "moccasin"
+                },
+                {
+                    "range": [70, 100],
+                    "color": "mistyrose"
+                }
+            ]
         }
     )
 )
 
 
-fig_revenue.update_layout(
-    height=420,
-    hovermode="x unified",
-    xaxis_title="Date",
-    yaxis_title="Revenue",
-    margin=dict(
-        l=20,
-        r=20,
-        t=20,
-        b=20
-    )
+fig_gauge.update_layout(
+    height=350
 )
 
 
 st.plotly_chart(
-    fig_revenue,
+    fig_gauge,
     use_container_width=True
 )
 
 
 # ============================================================
-# TWO-COLUMN SECTION
+# RISK STATUS
 # ============================================================
 
-left, right = st.columns(2)
+if risk_level == "CRITICAL":
 
-
-# ============================================================
-# METRIC CHANGE CHART
-# ============================================================
-
-with left:
-
-    st.markdown(
-        '<div class="section-title">'
-        '📉 Latest Metric Changes'
-        '</div>',
-        unsafe_allow_html=True
+    st.error(
+        f"🔴 CRITICAL BUSINESS RISK — "
+        f"{risk_score}/100"
     )
 
-    metric_names = [
-        "Revenue",
-        "Orders",
-        "Traffic",
-        "Conversion",
-        "Refunds"
-    ]
-
-    metric_changes = [
-        latest["Revenue_Change"],
-        latest["Orders_Change"],
-        latest["Traffic_Change"],
-        latest["Conversion_Change"],
-        latest["Refunds_Change"]
-    ]
-
-    fig_change = go.Figure(
-        go.Bar(
-            x=metric_names,
-            y=metric_changes,
-            text=[
-                f"{value:.1f}%"
-                for value in metric_changes
-            ],
-            textposition="outside"
-        )
-    )
-
-    fig_change.update_layout(
-        height=400,
-        yaxis_title="Change (%)",
-        margin=dict(
-            l=20,
-            r=20,
-            t=20,
-            b=20
-        )
-    )
-
-    st.plotly_chart(
-        fig_change,
-        use_container_width=True
-    )
-
-
-# ============================================================
-# COST VS REVENUE
-# ============================================================
-
-with right:
-
-    st.markdown(
-        '<div class="section-title">'
-        '💰 Revenue vs Cost'
-        '</div>',
-        unsafe_allow_html=True
-    )
-
-    fig_cost = go.Figure()
-
-    fig_cost.add_trace(
-        go.Scatter(
-            x=df["Date"],
-            y=df["Revenue"],
-            mode="lines+markers",
-            name="Revenue"
-        )
-    )
-
-    fig_cost.add_trace(
-        go.Scatter(
-            x=df["Date"],
-            y=df["Cost"],
-            mode="lines+markers",
-            name="Cost"
-        )
-    )
-
-    fig_cost.update_layout(
-        height=400,
-        yaxis_title="Amount",
-        hovermode="x unified",
-        margin=dict(
-            l=20,
-            r=20,
-            t=20,
-            b=20
-        )
-    )
-
-    st.plotly_chart(
-        fig_cost,
-        use_container_width=True
-    )
-
-
-# ============================================================
-# ANOMALY HISTORY
-# ============================================================
-
-st.markdown(
-    '<div class="section-title">'
-    '🔎 Anomaly History'
-    '</div>',
-    unsafe_allow_html=True
-)
-
-
-if show_anomalies:
-
-    history = df[
-        df["Anomaly"]
-    ].copy()
-
-else:
-
-    history = df.copy()
-
-
-history_display = history[
-    [
-        "Date",
-        "Revenue",
-        "Revenue_Change",
-        "Orders",
-        "Orders_Change",
-        "Conversion_Rate",
-        "Refunds",
-        "Severity",
-        "Anomaly"
-    ]
-].copy()
-
-
-history_display.columns = [
-    "Date",
-    "Revenue",
-    "Revenue Change %",
-    "Orders",
-    "Orders Change %",
-    "Conversion Rate",
-    "Refunds",
-    "Severity",
-    "Anomaly"
-]
-
-
-st.dataframe(
-    history_display,
-    use_container_width=True,
-    hide_index=True
-)
-
-
-# ============================================================
-# DOWNLOAD REPORT
-# ============================================================
-
-st.markdown(
-    '<div class="section-title">'
-    '📥 Download Report'
-    '</div>',
-    unsafe_allow_html=True
-)
-
-
-report_csv = history_display.to_csv(
-    index=False
-)
-
-
-st.download_button(
-    label="⬇️ Download Anomaly Report",
-    data=report_csv,
-    file_name="ai_anomaly_report.csv",
-    mime="text/csv"
-)
-
-
-# ============================================================
-# GEMINI AI ANALYSIS
-# ============================================================
-
-st.markdown(
-    '<div class="section-title">'
-    '🧠 Gemini AI Business Analysis'
-    '</div>',
-    unsafe_allow_html=True
-)
-
-
-if not GEMINI_API_KEY:
+elif risk_level == "HIGH":
 
     st.warning(
-        "Gemini API key was not found in the .env file."
+        f"🟠 HIGH BUSINESS RISK — "
+        f"{risk_score}/100"
+    )
+
+elif risk_level == "MEDIUM":
+
+    st.info(
+        f"🟡 MEDIUM BUSINESS RISK — "
+        f"{risk_score}/100"
     )
 
 else:
 
-    if st.button(
-        "🤖 Generate AI Business Insight",
+    st.success(
+        f"🟢 LOW BUSINESS RISK — "
+        f"{risk_score}/100"
+    )
+
+
+r1, r2, r3, r4, r5 = st.columns(5)
+
+
+with r1:
+
+    st.metric(
+        "Risk Score",
+        f"{risk_score}/100"
+    )
+
+
+with r2:
+
+    st.metric(
+        "Risk Level",
+        risk_level
+    )
+
+
+with r3:
+
+    st.metric(
+        "Critical",
+        risk_result[
+            "critical"
+        ]
+    )
+
+
+with r4:
+
+    st.metric(
+        "High",
+        risk_result[
+            "high"
+        ]
+    )
+
+
+with r5:
+
+    st.metric(
+        "Medium",
+        risk_result[
+            "medium"
+        ]
+    )
+
+
+# ============================================================
+# DETECTION METHOD
+# ============================================================
+
+if not anomaly_df.empty:
+
+    st.subheader(
+        "🔬 Detection Method"
+    )
+
+    method_counts = (
+        anomaly_df[
+            "Detection Method"
+        ]
+        .value_counts()
+        .reset_index()
+    )
+
+    method_counts.columns = [
+        "Detection Method",
+        "Anomalies"
+    ]
+
+    fig_method = px.bar(
+        method_counts,
+        x="Detection Method",
+        y="Anomalies",
+        title="How Anomalies Were Detected"
+    )
+
+    st.plotly_chart(
+        fig_method,
         use_container_width=True
+    )
+
+
+# ============================================================
+# MOST IMPORTANT ANOMALY
+# ============================================================
+
+st.subheader(
+    "🚨 Most Important Anomaly"
+)
+
+
+if not anomaly_df.empty:
+
+    severity_order = {
+        "CRITICAL": 1,
+        "HIGH": 2,
+        "MEDIUM": 3
+    }
+
+
+    important_anomalies = (
+        anomaly_df.copy()
+    )
+
+
+    important_anomalies[
+        "Severity Rank"
+    ] = (
+        important_anomalies[
+            "Severity"
+        ]
+        .map(severity_order)
+    )
+
+
+    important_anomalies = (
+        important_anomalies
+        .sort_values(
+            [
+                "Severity Rank",
+                "Deviation (%)"
+            ],
+            ascending=[
+                True,
+                False
+            ]
+        )
+    )
+
+
+    top_anomaly = (
+        important_anomalies
+        .iloc[0]
+    )
+
+
+    if top_anomaly[
+        "Severity"
+    ] == "CRITICAL":
+
+        st.error(
+            "🔴 CRITICAL ANOMALY DETECTED"
+        )
+
+    elif top_anomaly[
+        "Severity"
+    ] == "HIGH":
+
+        st.warning(
+            "🟠 HIGH-SEVERITY ANOMALY DETECTED"
+        )
+
+    else:
+
+        st.info(
+            "🟡 MEDIUM-SEVERITY ANOMALY DETECTED"
+        )
+
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+
+
+    with c1:
+
+        st.metric(
+            "Metric",
+            top_anomaly[
+                "Metric"
+            ]
+        )
+
+
+    with c2:
+
+        st.metric(
+            "Current",
+            f"{top_anomaly['Current Value']:,.2f}"
+        )
+
+
+    with c3:
+
+        st.metric(
+            "Baseline",
+            f"{top_anomaly['Historical Baseline']:,.2f}"
+        )
+
+
+    with c4:
+
+        st.metric(
+            "Deviation",
+            f"{top_anomaly['Deviation (%)']:.2f}%"
+        )
+
+
+    with c5:
+
+        st.metric(
+            "Z-Score",
+            str(
+                top_anomaly[
+                    "Z-Score"
+                ]
+            )
+        )
+
+
+# ============================================================
+# METRIC ANALYSIS
+# ============================================================
+
+st.subheader(
+    "📊 Metric Analysis"
+)
+
+
+for metric in selected_metrics:
+
+    if date_column:
+
+        fig = px.line(
+            analysis_df,
+            x=date_column,
+            y=metric,
+            markers=True,
+            title=f"{metric} Trend"
+        )
+
+    else:
+
+        chart_df = (
+            analysis_df
+            .reset_index()
+        )
+
+        fig = px.line(
+            chart_df,
+            x="index",
+            y=metric,
+            markers=True,
+            title=f"{metric} Trend"
+        )
+
+
+    fig.update_layout(
+        height=400
+    )
+
+
+    st.plotly_chart(
+        fig,
+        use_container_width=True
+    )
+
+
+# ============================================================
+# AI BUSINESS ANALYSIS
+# ============================================================
+
+st.subheader(
+    "🤖 AI Business Analysis"
+)
+
+
+if anomaly_df.empty:
+
+    st.info(
+        "No anomalies are available for AI analysis."
+    )
+
+else:
+
+    st.write(
+        "Gemini will analyze the detected anomalies "
+        "and provide business recommendations."
+    )
+
+
+    if st.button(
+        "🧠 Generate AI Business Report",
+        type="primary"
     ):
 
         with st.spinner(
-            "Gemini is analyzing the business data..."
+            "🤖 Gemini is analyzing your anomalies..."
         ):
 
-            try:
-
-                client = genai.Client(
-                    api_key=GEMINI_API_KEY
-                )
-
-
-                prompt = f"""
-You are a senior business data analyst.
-
-Analyze this latest business performance.
-
-Date:
-{latest_date.strftime("%Y-%m-%d")}
-
-Revenue:
-₹{latest["Revenue"]:,.0f}
-
-Revenue change:
-{latest["Revenue_Change"]:.2f}%
-
-Orders:
-{latest["Orders"]:,.0f}
-
-Orders change:
-{latest["Orders_Change"]:.2f}%
-
-Traffic:
-{latest["Traffic"]:,.0f}
-
-Traffic change:
-{latest["Traffic_Change"]:.2f}%
-
-Conversion rate:
-{latest["Conversion_Rate"]:.2f}%
-
-Conversion change:
-{latest["Conversion_Change"]:.2f}%
-
-Cost:
-₹{latest["Cost"]:,.0f}
-
-Refunds:
-{latest["Refunds"]:,.0f}
-
-Refund change:
-{latest["Refunds_Change"]:.2f}%
-
-Severity:
-{latest["Severity"]}
-
-Provide a concise business analysis with these sections:
-
-WHAT HAPPENED
-POSSIBLE CAUSES
-BUSINESS IMPACT
-RECOMMENDED ACTIONS
-
-Do not invent facts.
-Treat causes as possible hypotheses.
-Use simple professional business language.
-"""
+            result = generate_ai_report(
+                anomaly_df
+                .drop(
+                    columns=["Index"],
+                    errors="ignore"
+                ),
+                selected_metrics
+            )
 
 
-                response = client.models.generate_content(
-                    model="gemini-3.6-flash",
-                    contents=prompt
-                )
+        if result["success"]:
+
+            st.success(
+                "✅ AI business report generated."
+            )
 
 
-                st.markdown(
-                    '<div class="ai-box">',
-                    unsafe_allow_html=True
-                )
-
-                st.write(
-                    response.text
-                )
-
-                st.markdown(
-                    '</div>',
-                    unsafe_allow_html=True
-                )
+            st.markdown(
+                result["report"]
+            )
 
 
-            except Exception as e:
+            st.session_state[
+                "ai_report"
+            ] = result[
+                "report"
+            ]
 
-                st.error(
-                    f"Gemini error: {e}"
-                )
+        else:
+
+            st.error(
+                result["report"]
+            )
 
 
 # ============================================================
-# EMAIL ALERT HISTORY
+# DOWNLOAD AI REPORT
 # ============================================================
 
-st.markdown(
-    '<div class="section-title">'
-    '📧 Email Alert Status'
-    '</div>',
-    unsafe_allow_html=True
-)
+if "ai_report" in st.session_state:
+
+    st.subheader(
+        "📥 Download AI Report"
+    )
 
 
-if os.path.exists(ALERT_FILE):
+    st.download_button(
+        label="⬇️ Download AI Business Report",
+        data=st.session_state[
+            "ai_report"
+        ],
+        file_name=(
+            "AI_Business_Anomaly_Report.txt"
+        ),
+        mime="text/plain"
+    )
 
-    try:
 
-        alerts = pd.read_csv(
-            ALERT_FILE
+# ============================================================
+# DOWNLOAD ANOMALY REPORT
+# ============================================================
+
+if not anomaly_df.empty:
+
+    st.subheader(
+        "📥 Download Anomaly Report"
+    )
+
+
+    anomaly_csv = (
+        anomaly_df
+        .drop(
+            columns=["Index"],
+            errors="ignore"
         )
-
-        st.success(
-            f"Email alerts recorded: {len(alerts)}"
+        .to_csv(
+            index=False
         )
+    )
 
-        st.dataframe(
-            alerts,
-            use_container_width=True,
-            hide_index=True
-        )
 
-    except Exception:
-
-        st.info(
-            "Alert history exists but could not be displayed."
-        )
-
-else:
-
-    st.info(
-        "No email alerts have been recorded yet."
+    st.download_button(
+        label="⬇️ Download Anomaly CSV",
+        data=anomaly_csv,
+        file_name=(
+            "dynamic_anomaly_report.csv"
+        ),
+        mime="text/csv"
     )
 
 
@@ -916,9 +1098,11 @@ else:
 # FOOTER
 # ============================================================
 
-st.markdown("---")
+st.divider()
 
 st.caption(
     "🤖 AI Business Anomaly Agent | "
-    "Python • Pandas • Plotly • Streamlit • Gemini AI"
+    "Dynamic CSV/Excel Analytics + "
+    "Statistical Anomaly Detection + "
+    "Gemini AI + Business Risk Assessment"
 )
