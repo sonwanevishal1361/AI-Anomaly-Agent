@@ -10,9 +10,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-GEMINI_API_KEY = os.getenv(
-    "GEMINI_API_KEY"
-)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 
 # ============================================================
@@ -20,13 +18,10 @@ GEMINI_API_KEY = os.getenv(
 # ============================================================
 
 if GEMINI_API_KEY:
-
     client = genai.Client(
         api_key=GEMINI_API_KEY
     )
-
 else:
-
     client = None
 
 
@@ -34,19 +29,13 @@ else:
 # PREPARE ANOMALY DATA
 # ============================================================
 
-def prepare_anomaly_summary(
-    anomaly_df
-):
+def prepare_anomaly_summary(anomaly_df):
 
     if anomaly_df is None or anomaly_df.empty:
-
         return "No anomalies detected."
-
 
     data = anomaly_df.copy()
 
-
-    # Keep the most important columns
     preferred_columns = [
         "Date",
         "Metric",
@@ -58,32 +47,23 @@ def prepare_anomaly_summary(
         "Detection Method"
     ]
 
-
     available_columns = [
         column
         for column in preferred_columns
         if column in data.columns
     ]
 
-
     if available_columns:
+        data = data[available_columns]
 
-        data = data[
-            available_columns
-        ]
-
-
-    # Limit rows sent to AI
+    # Limit data sent to Gemini
     data = data.head(100)
 
-
-    return data.to_string(
-        index=False
-    )
+    return data.to_string(index=False)
 
 
 # ============================================================
-# GENERATE AI REPORT
+# GENERATE AI BUSINESS REPORT
 # ============================================================
 
 def generate_ai_report(
@@ -102,22 +82,17 @@ def generate_ai_report(
             )
         }
 
-
     try:
 
-        anomaly_summary = (
-            prepare_anomaly_summary(
-                anomaly_df
-            )
+        anomaly_summary = prepare_anomaly_summary(
+            anomaly_df
         )
-
 
         metrics_text = ", ".join(
             selected_metrics
             if selected_metrics
             else []
         )
-
 
         prompt = f"""
 You are a senior Business Intelligence analyst.
@@ -131,17 +106,14 @@ MONITORED METRICS:
 ANOMALY DATA:
 {anomaly_summary}
 
-
 Create a concise but professional business
 intelligence report.
 
 Use exactly these sections:
 
-
 # Executive Summary
 
 Give a short overview of the overall situation.
-
 
 # Key Findings
 
@@ -154,7 +126,6 @@ Mention:
 - historical baseline
 - percentage deviation
 - severity
-
 
 # Business Impact
 
@@ -173,7 +144,6 @@ Discuss possible impact on:
 Only discuss areas that are relevant to
 the detected metrics.
 
-
 # Possible Causes
 
 Give realistic possible explanations.
@@ -181,19 +151,16 @@ Give realistic possible explanations.
 Clearly state that these are hypotheses
 and not confirmed causes.
 
-
 # Recommended Actions
 
 Give 4 to 6 practical actions.
 
 Prioritize the most important action first.
 
-
 # Monitoring Priorities
 
 Explain which metrics or business areas
 should be monitored next.
-
 
 # Risk Assessment
 
@@ -206,7 +173,6 @@ CRITICAL
 
 Explain why.
 
-
 IMPORTANT RULES:
 
 - Do not invent data.
@@ -218,15 +184,16 @@ IMPORTANT RULES:
 - Focus on actionable business insights.
 """
 
+        # ====================================================
+        # GEMINI API CALL
+        # ====================================================
 
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.6-flash",
             contents=prompt
         )
 
-
         report = response.text
-
 
         if not report:
 
@@ -237,12 +204,10 @@ IMPORTANT RULES:
                 )
             }
 
-
         return {
             "success": True,
             "report": report
         }
-
 
     except Exception as e:
 
@@ -266,13 +231,10 @@ if __name__ == "__main__":
     print("🤖 AI REPORT GENERATOR TEST")
     print("=" * 60)
 
-
     if client is None:
 
         print()
-        print(
-            "❌ GEMINI_API_KEY not found."
-        )
+        print("❌ GEMINI_API_KEY not found.")
 
     else:
 
@@ -320,19 +282,15 @@ if __name__ == "__main__":
             }
         )
 
-
         result = generate_ai_report(
             test_data,
             ["Sales", "Profit"]
         )
 
-
         if result["success"]:
 
             print()
-            print(
-                result["report"]
-            )
+            print(result["report"])
 
             print()
             print(
@@ -342,6 +300,4 @@ if __name__ == "__main__":
         else:
 
             print()
-            print(
-                result["report"]
-            )
+            print(result["report"])
